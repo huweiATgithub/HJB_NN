@@ -94,13 +94,13 @@ class BurgersProblem(ProblemPrototype):
         self.RG = - Rinv @ G.T
 
     def U_star(self, X_aug):
-        '''Control as a function of the costate.'''
+        """Control as a function of the costate."""
         A = X_aug[self.N_states:2 * self.N_states]
         U = - A[self.Iw_idx].sum(axis=0, keepdims=True) / self.W1
         return U
 
     def make_U_NN(self, A):
-        '''Makes TensorFlow graph of optimal control with NN value gradient.'''
+        """Makes TensorFlow graph of optimal control with NN value gradient."""
         from tensorflow import reduce_sum
 
         U = reduce_sum(A[self.Iw_idx[0]:self.Iw_idx[-1] + 1],
@@ -116,6 +116,7 @@ class BurgersProblem(ProblemPrototype):
             vT = X_aug_T[2 * self.N_states:]
 
             # Derivative of the terminal cost with respect to X(T)
+            # lambda(T) = dF/dX(X(T))
             dFdXT = self.W2 * XT * self.w_flat
 
             return np.concatenate((X0 - X0_in, AT - dFdXT, vT))
@@ -147,7 +148,7 @@ class BurgersProblem(ProblemPrototype):
         """Evaluation of the augmented dynamics at a vector of time instances
         for solution of the two-point BVP."""
 
-        # Control as a function of the costate
+        # Control as a function of the augmented state
         U = self.U_star(X_aug)
 
         X = X_aug[:self.N_states]
