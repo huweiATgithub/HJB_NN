@@ -27,7 +27,7 @@ def tpbvp_HJB_solve(aug_dynamics: callable, bc: callable, x, time_marchs, initia
         x_guess = np.hstack((x_guess, x_guess[:, -1:]))  # use current value to be next guess
 
         SOL = solve_bvp(aug_dynamics, bc, t, x_guess, tol=tolerance, max_nodes=max_nodes, verbose=0)
-        if not SOL.suceess:
+        if not SOL.success:
             status = False
             print(SOL.message)
             break
