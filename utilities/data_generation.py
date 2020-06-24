@@ -9,8 +9,15 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
                              X0_sample=None, initial_tol=1e-1,
                              save_path=None):
     X0s = X0_sample
-    if X0s is None:
-        X0s = problem.sample_X0(config.Ns['train'])
+    if isinstance(X0s, str):
+        if X0s == 'train':
+            X0s = problem.sample_X0(config.Ns['train'])
+        elif X0s == 'val':
+            X0s = problem.sample_X0(config.Ns['val'])
+        else:
+            return
+
+
     N_states, Ns = X0s.shape
 
     # for storing data
