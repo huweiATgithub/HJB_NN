@@ -5,6 +5,9 @@ import abc
 
 class ConfigPrototype:
 
+    def __init__(self):
+        self.tseq = None
+
     def build_layers(self, N_states, time_dependent, N_layers, N_neurons):
         layers = [N_states] + N_layers * [N_neurons] + [1]
 

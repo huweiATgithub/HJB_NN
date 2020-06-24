@@ -24,7 +24,7 @@ class BurgersConfigNN(ConfigPrototype):
         self.t1 = 8.
 
         # Time subintervals to use in time marching
-        self.tseq = self.t1 * np.array([1e-03, 1e-02, .1, .125, .15,
+        self.tseq = self.t1 * np.array([0., 1e-03, 1e-02, .1, .125, .15,
                                         .2, .3, .4, .5, .6, .7, .8, .9, 1.])
 
         # Time step for integration and sampling
@@ -47,7 +47,6 @@ class BurgersConfigNN(ConfigPrototype):
 class BurgersProblem(ProblemPrototype):
 
     def __init__(self):
-        super().__init__()
         self.N_states = 20
         self.N_controls = 1
         self.t1 = 8.
@@ -118,6 +117,8 @@ class BurgersProblem(ProblemPrototype):
             # Derivative of the terminal cost with respect to X(T)
             # lambda(T) = dF/dX(X(T))
             dFdXT = self.W2 * XT * self.w_flat
+            # FXT = 0.5 * self.W2 * np.dot(XT**2, self.w_flat); We don't need this, we remove terminal cost when solving
+            # HJB
 
             return np.concatenate((X0 - X0_in, AT - dFdXT, vT))
 
