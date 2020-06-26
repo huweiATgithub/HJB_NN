@@ -1,8 +1,8 @@
 import numpy as np
-from scipy.integrate import solve_bvp
+from scipy.integrate import solve_bvp, solve_ivp
 
 
-def tpbvp_HJB_solve(aug_dynamics: callable, bc: callable, x, time_marchs, initial_tol, tol, max_nodes):
+def tpbvp_hjb_solve_time_march(aug_dynamics: callable, bc: callable, x, time_marchs, initial_tol, tol, max_nodes):
     """
     :param max_nodes: maximal number of mesh nodes
     :param bc: boundary condition
@@ -35,3 +35,15 @@ def tpbvp_HJB_solve(aug_dynamics: callable, bc: callable, x, time_marchs, initia
         x_guess = SOL.y
 
     return status, t, x_guess
+
+
+def tpbvp_hjb_solve_warm_start(dynamics: callable, eval_U: callable, x, t, ode_solver, bvp_guess,
+                               aug_dynamics: callable, bc: callable, tol, max_nodes):
+    SOL = solve_ivp(dynamics, t, x, method=ode_solver, args=(eval_U,), rtol=1e-4)
+    # compute V and dV/dx at several points along (SOL.t, SOL.y). There might be more than that in t.
+    V_guess, A_guess = bvp_guess(SOL.t.reshape(1, -1), SOL.y)
+    X_aug_guess = np.vstack((SOL.y, A_guess, V_guess))
+    SOL = solve_bvp(aug_dynamics, bc, SOL.t, X_aug_guess, verbose=0, tol=tol, max_nodes=max_nodes)
+
+    return SOL.success, SOL.t, SOL.y
+
