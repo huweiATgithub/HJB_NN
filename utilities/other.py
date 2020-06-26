@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.io import loadmat
 
 
 def cheb(N):
@@ -34,3 +35,16 @@ def cheb(N):
     w[1:-1] = 2.*v/N
 
     return X_nodes, D, w
+
+
+def load_neural_network(model_path, return_stats=False):
+    model_dict = loadmat(model_path)
+    parameters = {'weights': model_dict['weights'][0],
+                  'biases': model_dict['biases'][0]
+                  }
+    scaling = {'lb': model_dict['lb'], 'ub': model_dict['ub'],
+               'A_lb': model_dict['A_lb'], 'A_ub': model_dict['A_ub'],
+               'U_lb': model_dict['U_lb'], 'U_ub': model_dict['U_ub'],
+               'V_min': model_dict['V_min'].flatten(),
+               'V_max': model_dict['V_max'].flatten()}
+    return parameters, scaling
