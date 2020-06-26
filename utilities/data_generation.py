@@ -2,7 +2,7 @@ import time
 import numpy as np
 import scipy.io
 from models.problem import ProblemPrototype, ConfigPrototype
-from utilities.ode_solver import tpbvp_HJB_solve
+from utilities.ode_solver import tpbvp_hjb_solve_time_march
 
 
 def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
@@ -38,8 +38,8 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
 
         start_time = time.time()
 
-        status, t, X_sol = tpbvp_HJB_solve(problem.aug_dynamics, bc, X0_aug_guess,
-                                           config.tseq, initial_tol, config.data_tol, config.max_nodes)
+        status, t, X_sol = tpbvp_hjb_solve_time_march(problem.aug_dynamics, bc, X0_aug_guess,
+                                                      config.tseq, initial_tol, config.data_tol, config.max_nodes)
         end_time = time.time()
         time_elapsed = end_time - start_time
         if status:

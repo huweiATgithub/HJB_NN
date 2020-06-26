@@ -42,6 +42,8 @@ class BurgersConfigNN(ConfigPrototype):
             'weight_A': [10.],
             'BFGS_opts': {}
         }
+        self.data_mode = {'sample': 'arbitrary',
+                          'evaluate': 'dVdX'}
 
 
 class BurgersProblem(ProblemPrototype):
