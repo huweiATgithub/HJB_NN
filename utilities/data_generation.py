@@ -17,7 +17,6 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
         else:
             return
 
-
     N_states, Ns = X0s.shape
 
     # for storing data
@@ -33,7 +32,7 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
     N_fail = 0
     while N_sol < Ns:
         X0 = X0s[:, N_sol]
-        X0_aug_guess = np.vstack((X0.reshape(-1, 1), np.zeros(N_states + 1, 1)))
+        X0_aug_guess = np.vstack((X0.reshape(-1, 1), np.zeros((N_states + 1, 1))))
         bc = problem.make_bc(X0)
 
         start_time = time.time()
@@ -76,14 +75,16 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
     print('Total data generated:', X_OUT.shape[1])
     print('')
 
+    save_dict = {
+        't': t_OUT,
+        'X': X_OUT,
+        'A': A_OUT,
+        'V': V_OUT
+    }
     if save_path:
-        save_dict = {
-            't': t_OUT,
-            'X': X_OUT,
-            'A': A_OUT,
-            'V': V_OUT
-        }
         scipy.io.savemat(save_path, save_dict)
+    else:
+        return save_dict
 
 
 
