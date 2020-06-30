@@ -5,13 +5,11 @@ import scipy.io
 from models.problem import ProblemPrototype, ConfigPrototype
 from utilities.ode_solver import tpbvp_hjb_solve_time_march
 
-np.seterr(over='warn', divide='warn', invalid='warn')
-warnings.filterwarnings('error')
-
 
 def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
                              X0_sample=None, initial_tol=1e-1,
                              save_path=None):
+
     X0s = X0_sample
     if isinstance(X0s, str):
         if X0s == 'train':
@@ -34,6 +32,11 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
     N_sol = 0
     N_success = 0
     N_fail = 0
+
+    # Also catch float point warning
+    np.seterr(over='warn', divide='warn', invalid='warn')
+    warnings.filterwarnings('error')
+
     while N_sol < Ns:
         print('Solving BVP #', N_sol + 1, 'of', Ns, '...', end='\n')
         X0 = X0s[:, N_sol]
@@ -63,6 +66,8 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
                 N_sol += 1
             N_fail += 1
             fail_time.append(time.time() - start_time)
+
+    warnings.resetwarnings()
 
     sol_time = np.sum(sol_time)
     fail_time = np.sum(fail_time)

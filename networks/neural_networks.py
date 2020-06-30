@@ -342,6 +342,7 @@ class HJBValueNetwork:
             except Warning:
                 pass
 
+        warnings.resetwarnings()
         print("Generated %d data from %d (of %d tries) BVP solutions in %.1f sec" %
               (X_OUT.shape[1], N_sol, N_tries, time.time() - start_time))
         data = {'t': t_OUT, 'X': X_OUT, 'A': A_OUT, 'V': V_OUT,
