@@ -373,9 +373,9 @@ class HJBValueNetwork:
     def choose_state(self, x, mode='dVdX'):
         print("Choosing initial state using %s" % mode)
         if mode == 'V':
-            idx = self.get_largest_V(np.zeros(1, x.shape[1]), x, 1)
+            idx = self.get_largest_V(np.zeros((1, x.shape[1])), x, 1)
         else:
-            idx = self.get_largest_A(np.zeros(1, x.shape[1]), x, 1)
+            idx = self.get_largest_A(np.zeros((1, x.shape[1])), x, 1)
 
         return x[:, idx[0]]
 
