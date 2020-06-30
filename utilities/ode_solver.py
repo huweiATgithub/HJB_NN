@@ -45,5 +45,4 @@ def tpbvp_hjb_solve_warm_start(dynamics: callable, eval_U: callable, x, t, ode_s
     X_aug_guess = np.vstack((SOL.y, A_guess, V_guess))
     SOL = solve_bvp(aug_dynamics, bc, SOL.t, X_aug_guess, verbose=0, tol=tol, max_nodes=max_nodes)
 
-    return SOL.success, SOL.t, SOL.y
-
+    return SOL.success, SOL.x, SOL.y
