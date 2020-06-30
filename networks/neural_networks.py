@@ -149,11 +149,14 @@ class HJBValueNetwork:
         })
 
         # Rounds
-        max_rounds = options.pop('max_rounds')
+        max_rounds = options.pop('max_rounds', 1)
 
         # weights of losses
         weight_A = options.pop('weight_A', np.zeros(max_rounds))
         weight_U = options.pop('weight_U', np.zeros(max_rounds))
+
+        assert len(weight_A) == max_rounds and len(weight_U) == max_rounds, "Number of loss weights must equal to " \
+                                                                            "number of rounds "
         self.weight_A_tf = tf.placeholder(tf.float32, shape=())
         self.weight_U_tf = tf.placeholder(tf.float32, shape=())
         self.loss = self.loss_V
