@@ -36,6 +36,10 @@ class HJBValueNetwork:
         dVdX_scaled = 2.0 * (self.dVdX - self.A_lb) / (self.A_ub - self.A_lb) - 1.0
         U_scaled = 2.0 * (self.U - self.U_lb) / (self.U_ub - self.U_lb) - 1.0
 
+        self.A_scaled_tf = tf.placeholder(tf.float32, shape=(N_states, None))
+        self.U_scaled_tf = tf.placeholder(tf.float32, shape=(N_controls, None))
+        self.V_scaled_tf = tf.placeholder(tf.float32, shape=(1, None))
+
         self.loss_V = tf.reduce_mean((V_pred_scaled - self.V_scaled_tf) ** 2)
         self.loss_A = tf.reduce_mean(
             tf.reduce_sum((dVdX_scaled - self.A_scaled_tf) ** 2, axis=0)
@@ -47,10 +51,6 @@ class HJBValueNetwork:
         self.A_tf = tf.placeholder(tf.float32, shape=(N_states, None))
         self.U_tf = tf.placeholder(tf.float32, shape=(N_controls, None))
         self.V_tf = tf.placeholder(tf.float32, shape=(1, None))
-
-        self.A_scaled_tf = tf.placeholder(tf.float32, shape=(N_states, None))
-        self.U_scaled_tf = tf.placeholder(tf.float32, shape=(N_controls, None))
-        self.V_scaled_tf = tf.placeholder(tf.float32, shape=(1, None))
 
         self.MAE = tf.reduce_mean(tf.abs(self.V_pred - self.V_tf))
         self.grad_MRL2 = tf.reduce_mean(tf.sqrt(
