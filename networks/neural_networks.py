@@ -126,21 +126,47 @@ class HJBValueNetwork:
             return self.sess.run((self.V_pred, self.dVdX), feed_dict)
 
     def train(self, train_data, val_data, options):
+
+        # Prepare data
+        train_data.update(
+            {
+                'U': self.problem.U_star(np.vstack((train_data['X'], train_data['A'])))
+            }
+        )
+        train_data.update({
+            'A_scaled': 2. * (train_data['A'] - self.A_lb) / (self.A_ub - self.A_lb) - 1.,
+            'U_scaled': 2. * (train_data['U'] - self.U_lb) / (self.U_ub - self.U_lb) - 1.,
+            'V_scaled': 2. * (train_data['V'] - self.V_min) / (self.V_max - self.V_min) - 1.
+        })
+        val_data = {
+            self.t_tf: val_data.pop('t'),
+            self.X_tf: val_data.pop('X'),
+            self.V_tf: val_data.pop('V'),
+            self.A_tf: val_data.pop('A'),
+        }
+        val_data.update({
+            self.U_tf: self.problem.U_star(np.vstack((val_data[self.X_tf], val_data[self.A_tf])))
+        })
+
+        # Rounds
         max_rounds = options.pop('max_rounds')
+
+        # weights of losses
         weight_A = options.pop('weight_A', np.zeros(max_rounds))
         weight_U = options.pop('weight_U', np.zeros(max_rounds))
         self.weight_A_tf = tf.placeholder(tf.float32, shape=())
         self.weight_U_tf = tf.placeholder(tf.float32, shape=())
-
         self.loss = self.loss_V
         if weight_A[0] >= 10.0 * np.finfo(float).eps:
             self.loss += self.weight_A_tf * self.loss_A
         if weight_U[0] >= 10.0 * np.finfo(float).eps:
             self.loss += self.weight_U_tf * self.loss_U
 
+        # Optimizer
         self.grads_list = [None] * 3
         optimizer = None
 
+        # Records
         train_err = []
         train_grad_err = []
         train_ctrl_err = []
@@ -159,6 +185,7 @@ class HJBValueNetwork:
         # def loss_callback(fetches_);
         # it will then match: fetches_ = [self.MAE, self.grad_MRL2, self.ctrl_MRL2]
 
+        # Batch size, maximal batch size, number of candidate initial states, batch size growth factor
         self.Ns = options.pop('batch_size', train_data['X'].shape[1])
         Ns_max = options.pop('max_batch_size', 32768)
         Ns_cand = options.pop('Ns_cand', 2)
