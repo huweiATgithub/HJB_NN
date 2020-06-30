@@ -337,7 +337,7 @@ class HJBValueNetwork:
                 )
                 if not status:
                     warnings.warn(Warning())
-                    N_sol += 1
+                N_sol += 1
                 V = X_aug[-1:] + self.problem.terminal_cost(X_aug[:N_states, -1])
                 t_OUT = np.hstack((t_OUT, t.reshape(1, -1)))
                 X_OUT = np.hstack((X_OUT, X_aug[:N_states]))
