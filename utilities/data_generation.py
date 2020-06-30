@@ -1,8 +1,12 @@
 import time
+import warnings
 import numpy as np
 import scipy.io
 from models.problem import ProblemPrototype, ConfigPrototype
 from utilities.ode_solver import tpbvp_hjb_solve_time_march
+
+np.seterr(over='warn', divide='warn', invalid='warn')
+warnings.filterwarnings('error')
 
 
 def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
@@ -31,17 +35,18 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
     N_success = 0
     N_fail = 0
     while N_sol < Ns:
+        print('Solving BVP #', N_sol + 1, 'of', Ns, '...', end='\n')
         X0 = X0s[:, N_sol]
         X0_aug_guess = np.vstack((X0.reshape(-1, 1), np.zeros((N_states + 1, 1))))
         bc = problem.make_bc(X0)
 
         start_time = time.time()
+        try:
+            status, t, X_sol = tpbvp_hjb_solve_time_march(problem.aug_dynamics, bc, X0_aug_guess,
+                                                          config.tseq, initial_tol, config.data_tol, config.max_nodes)
+            if not status:
+                warnings.warn(Warning())
 
-        status, t, X_sol = tpbvp_hjb_solve_time_march(problem.aug_dynamics, bc, X0_aug_guess,
-                                                      config.tseq, initial_tol, config.data_tol, config.max_nodes)
-        end_time = time.time()
-        time_elapsed = end_time - start_time
-        if status:
             # as we don't consider terminal cost when solving HJB, we need to add it back to data
             V = X_sol[-1:] + problem.terminal_cost(X_sol[:N_states, -1])
             t_OUT = np.hstack((t_OUT, t.reshape(1, -1)))
@@ -50,14 +55,14 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
             V_OUT = np.hstack((V_OUT, V))
             N_sol += 1
             N_success += 1
-            sol_time.append(time_elapsed)
-        else:
-            if X0_sample is None:
-                N_sol += 1
-            else:
+            sol_time.append(time.time() - start_time)
+        except Warning:
+            if isinstance(X0_sample, str):
                 X0s[:, N_sol] = problem.sample_X0(1)
+            else:
+                N_sol += 1
             N_fail += 1
-            fail_time.append(time_elapsed)
+            fail_time.append(time.time() - start_time)
 
     sol_time = np.sum(sol_time)
     fail_time = np.sum(fail_time)
