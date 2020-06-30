@@ -37,7 +37,7 @@ def cheb(N):
     return X_nodes, D, w
 
 
-def load_neural_network(model_path, return_stats=False):
+def load_neural_network(model_path):
     model_dict = loadmat(model_path)
     parameters = {'weights': model_dict['weights'][0],
                   'biases': model_dict['biases'][0]
@@ -48,3 +48,17 @@ def load_neural_network(model_path, return_stats=False):
                'V_min': model_dict['V_min'].flatten(),
                'V_max': model_dict['V_max'].flatten()}
     return parameters, scaling
+
+
+def get_scaling_from_data_dict(data_dict: dict):
+    t_OUT, X_OUT, A_OUT, U, V_OUT = data_dict['t'], data_dict['X'], data_dict['A'], data_dict['U'], data_dict['V']
+    scaling = {
+        'lb': np.min(X_OUT, axis=1, keepdims=True),
+        'ub': np.max(X_OUT, axis=1, keepdims=True),
+        'A_lb': np.min(A_OUT, axis=1, keepdims=True),
+        'A_ub': np.max(A_OUT, axis=1, keepdims=True),
+        'U_lb': np.min(U, axis=1, keepdims=True),
+        'U_ub': np.max(U, axis=1, keepdims=True),
+        'V_min': np.min(V_OUT).flatten(), 'V_max': np.max(V_OUT).flatten(),
+    }
+    return scaling
