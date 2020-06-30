@@ -279,6 +279,11 @@ class HJBValueNetwork:
         """
         generate Nd samples, each sample has initial state from Ns_cand candidates
         """
+        import warnings
+        np.seterr(over='warn', divide='warn', invalid='warn')
+        warnings.filterwarnings('error')
+        print("Generating data.")
+
         N_states = self.problem.N_states
         t_OUT = np.empty((1, 0))
         X_OUT = np.empty((N_states, 0))
@@ -286,24 +291,32 @@ class HJBValueNetwork:
         V_OUT = np.empty((1, 0))
 
         N_tries = 0
+        N_sol = 0
         start_time = time.time()
         while X_OUT.shape[1] < Nd:
             X0 = self.sample_X0(Ns_cand, mode=self.config.data_mode['sample'])
             X0 = self.choose_state(X0, mode=self.config.data_mode['evaluate'])
             bc = self.problem.make_bc(X0)
-            status, t, X_aug = tpbvp_hjb_solve_warm_start(
-                self.problem.dynamics, self.eval_U, X0, [0., self.t1], self.config.ODE_solver,
-                self.bvp_guess,
-                self.problem.aug_dynamics, bc, self.config.data_tol, self.config.max_nodes
+            try:
+                N_tries += 1
+                status, t, X_aug = tpbvp_hjb_solve_warm_start(
+                    self.problem.dynamics, self.eval_U, X0, [0., self.t1], self.config.ODE_solver,
+                    self.bvp_guess,
+                    self.problem.aug_dynamics, bc, self.config.data_tol, self.config.max_nodes
                 )
-            N_tries += 1
-            if status:
+                if not status:
+                    warnings.warn(Warning())
+                    N_sol += 1
                 V = X_aug[-1:] + self.problem.terminal_cost(X_aug[:N_states, -1])
                 t_OUT = np.hstack((t_OUT, t.reshape(1, -1)))
                 X_OUT = np.hstack((X_OUT, X_aug[:N_states]))
                 A_OUT = np.hstack((A_OUT, X_aug[N_states:2 * N_states]))
                 V_OUT = np.hstack((V_OUT, V))
-        print("Generated %d data from BVP solutions in %.1f sec" % (X_OUT.shape[1], time.time() - start_time))
+            except Warning:
+                pass
+
+        print("Generated %d data from %d (of %d tries) BVP solutions in %.1f sec" %
+              (X_OUT.shape[1], N_sol, N_tries, time.time() - start_time))
         data = {'t': t_OUT, 'X': X_OUT, 'A': A_OUT, 'V': V_OUT,
                 'U': self.problem.U_star(np.vstack((X_OUT, A_OUT)))
                 }
@@ -315,6 +328,7 @@ class HJBValueNetwork:
         return data
 
     def sample_X0(self, n, mode='arbitrary', **kwargs):
+        print("Sampling initial state using method %s" % mode)
         if mode == 'radius':
             radius = kwargs.get('radius', 1)
             X0 = np.random.rand(self.problem.N_states, n)
@@ -326,14 +340,13 @@ class HJBValueNetwork:
         return X0
 
     def choose_state(self, x, mode='dVdX'):
+        print("Choosing initial state using %s" % mode)
         if mode == 'V':
             idx = self.get_largest_V(np.zeros(1, x.shape[1]), x, 1)
         else:
             idx = self.get_largest_A(np.zeros(1, x.shape[1]), x, 1)
 
         return x[:, idx[0]]
-
-
 
     def initialize_net(self, layers, parameters):
         weights, biases = [], []
