@@ -80,11 +80,13 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
     print('Total data generated:', X_OUT.shape[1])
     print('')
 
+    U = problem.U_star(np.vstack((X_OUT, A_OUT)))
     save_dict = {
         't': t_OUT,
         'X': X_OUT,
         'A': A_OUT,
-        'V': V_OUT
+        'V': V_OUT,
+        'U': U,
     }
     if save_path:
         scipy.io.savemat(save_path, save_dict)
