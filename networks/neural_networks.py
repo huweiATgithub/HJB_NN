@@ -383,5 +383,14 @@ class HJBValueNetwork:
             weights[l], biases[l] = self.sess.run(
                 (self.weights[l], self.biases[l])
             )
+        model_dict = {
+            'lb': self.lb, 'ub': self.ub,
+            'A_lb': self.A_lb, 'A_ub': self.A_ub,
+            'U_lb': self.U_lb, 'U_ub': self.U_ub,
+            'V_min': self.V_min, 'V_max': self.V_max
+        }
+        model_dict.update({
+            'weights': weights, 'biases': biases
+        })
 
-        return weights, biases
+        return model_dict
