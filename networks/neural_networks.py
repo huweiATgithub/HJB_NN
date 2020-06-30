@@ -212,7 +212,8 @@ class HJBValueNetwork:
                 })
             self.Ns = np.minimum(self.Ns, Ns_max)
 
-            print('Optimization round', round, ':')
+            print('')
+            print('# Optimization round', round, ':')
             print('Batch size = %d, gradient weight = %1.1e, control weight = %1.1e'
                   % (self.Ns, weight_A[round - 1], weight_U[round - 1]))
 
