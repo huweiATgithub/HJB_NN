@@ -148,8 +148,10 @@ class HJBValueNetwork:
             self.U_tf: self.problem.U_star(np.vstack((val_data[self.X_tf], val_data[self.A_tf])))
         })
 
+        conv_tol = self.config.conv_tol
         # Rounds
         max_rounds = options.pop('max_rounds', 1)
+        min_rounds = options.pop('min_rounds', 1)
 
         # weights of losses
         weight_A = options.pop('weight_A', np.zeros(max_rounds))
@@ -269,7 +271,15 @@ class HJBValueNetwork:
             print('Training ctrl. MRL2 error = %1.1e' % (train_ctrl_err[-1]))
             print('Validation ctrl. MRL2 error = %1.1e' % (val_ctrl_err[-1]))
 
-            self.Ns *= Ns_C
+            # ----------------------------------------------------------------------
+            if max_rounds > 1:
+                if self.convergence_test(tf_dict, optimizer.grad_eval, conv_tol, Ns_sub=int(self.Ns/8), C=Ns_C):
+                    if round >= min_rounds:
+                        print('Convergence test satisfied, stopping optimization.')
+                        break
+                    else:
+                        print('Convergence test satisfied, but have not trained for minimum number of rounds.')
+                        self.Ns *= Ns_C
 
         errors = (np.array(train_err), np.array(train_grad_err),
                   np.array(train_ctrl_err), np.array(val_err),
@@ -305,6 +315,59 @@ class HJBValueNetwork:
         self.run_initializer()
         optimizer.minimize(self.sess, feed_dict=tf_dict, fetches=fetches, loss_callback=callback)
         return optimizer
+
+    def convergence_test(self, tf_dict, sample_grad, epsilon, Ns_sub=1024, C=2):
+        """Convergence test as described in the paper."""
+        print('')
+        print('Running convergence test...')
+
+        sample_grad = np.linalg.norm(sample_grad, ord=1)
+
+        # Calculates sample variance for (a subsample of) the batch
+        idx = np.random.choice(self.Ns, Ns_sub, replace=False)
+
+        tf_dict.update({
+            self.t_tf: tf_dict[self.t_tf][:, idx],
+            self.X_tf: tf_dict[self.X_tf][:, idx],
+            self.A_scaled_tf: tf_dict[self.A_scaled_tf][:, idx],
+            self.U_scaled_tf: tf_dict[self.U_scaled_tf][:, idx],
+            self.V_scaled_tf: tf_dict[self.V_scaled_tf][:, idx],
+        })
+
+        # ----------------------------------------------------------------------
+
+        sample_var = np.empty((Ns_sub, self.packed_loss_grad.shape[0]))
+        for i in range(Ns_sub):
+            sample_var[i] = self.sess.run(self.packed_loss_grad, {
+                self.t_tf: tf_dict[self.t_tf][:, i:i + 1],
+                self.X_tf: tf_dict[self.X_tf][:, i:i + 1],
+                self.A_scaled_tf: tf_dict[self.A_scaled_tf][:, i:i + 1],
+                self.U_scaled_tf: tf_dict[self.U_scaled_tf][:, i:i + 1],
+                self.V_scaled_tf: tf_dict[self.V_scaled_tf][:, i:i + 1],
+                self.weight_A_tf: tf_dict[self.weight_A_tf],
+                self.weight_U_tf: tf_dict[self.weight_U_tf]
+            })
+
+        sample_var = np.var(sample_var, axis=0, ddof=1, dtype=np.float64)
+        sample_var = sample_var.sum()
+
+        # ----------------------------------------------------------------------
+
+        print('sample variance = %1.4e' % sample_var)
+        print('sample gradient = %1.4e' % sample_grad)
+        print('epsilon = %1.4e' % epsilon, ', Ns_sub =', Ns_sub)
+
+        if sample_var <= epsilon * Ns_sub * sample_grad:
+            # Convergence condition satisfied
+            return True
+        else:
+            Ns_min = int(sample_var / (epsilon * sample_grad))
+            if self.Ns >= Ns_min:
+                Ns_min = int(self.Ns * (Ns_min / Ns_sub))
+            self.Ns = np.minimum(C * self.Ns, Ns_min)
+
+            print('Convergence test failed, estimated minimum batch size:', self.Ns)
+            return False
 
     def generate_data(self, Nd, Ns_cand):
         """
