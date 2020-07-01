@@ -148,7 +148,7 @@ class HJBValueNetwork:
             self.U_tf: self.problem.U_star(np.vstack((val_data[self.X_tf], val_data[self.A_tf])))
         })
 
-        conv_tol = self.config.conv_tol
+        conv_tol = options.pop('conv_tol', 1e-3)
         # Rounds
         max_rounds = options.pop('max_rounds', 1)
         min_rounds = options.pop('min_rounds', 1)
