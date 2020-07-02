@@ -70,6 +70,9 @@ class HJBValueNetwork:
         self.largest_V = tf.nn.top_k(self.V_pred, k=self.k_largest, sorted=False)
 
         self.sess = None
+        # related to optimization
+        self.grads_list = [None] * 3
+        self.optimizer = None
 
     def make_eval_graph(self, t, X):
         """Builds the NN computational graph."""
@@ -168,7 +171,6 @@ class HJBValueNetwork:
             self.loss += self.weight_U_tf * self.loss_U
 
         # Optimizer
-        self.grads_list = [None] * 3
         optimizer = None
 
         # Records
@@ -273,13 +275,150 @@ class HJBValueNetwork:
 
             # ----------------------------------------------------------------------
             if max_rounds > 1:
-                if self.convergence_test(tf_dict, optimizer.grad_eval, conv_tol, Ns_sub=int(self.Ns/8), C=Ns_C):
+                if self.convergence_test(tf_dict, optimizer.grad_eval, conv_tol, Ns_sub=int(self.Ns / 8), C=Ns_C):
                     if round >= min_rounds:
                         print('Convergence test satisfied, stopping optimization.')
                         break
                     else:
                         print('Convergence test satisfied, but have not trained for minimum number of rounds.')
                         self.Ns *= Ns_C
+
+        errors = (np.array(train_err), np.array(train_grad_err),
+                  np.array(train_ctrl_err), np.array(val_err),
+                  np.array(val_grad_err), np.array(val_ctrl_err))
+
+        return round_iters, errors
+
+    def prepare_data(self, data, mode):
+        """
+        This function will update data dict for training: it will,
+            - Calculate U using X and A; (train and val)
+            - Calculate Scaled A,U,V. (train)
+        :param data: should contain key: X, A, V
+        """
+        supported_mode = ['train', 'val']
+        if mode not in supported_mode:
+            print("%s not supported, please check.")
+        if mode == 'train':
+            data.update({
+                'U': self.problem.U_star(np.vstack((data['X'], data['A'])))
+            })
+            data.update({
+                'A_scaled': 2. * (data['A'] - self.A_lb) / (self.A_ub - self.A_lb) - 1.,
+                'U_scaled': 2. * (data['U'] - self.U_lb) / (self.U_ub - self.U_lb) - 1.,
+                'V_scaled': 2. * (data['V'] - self.V_min) / (self.V_max - self.V_min) - 1.
+            })
+        if mode == 'val':
+            data.update({
+                'U': self.problem.U_star(np.vstack((data['X'], data['A'])))
+            })
+
+    def train_a_round(self, train_data, val_data, options):
+        val_data = {
+            self.t_tf: val_data['t'],
+            self.X_tf: val_data['X'],
+            self.V_tf: val_data['V'],
+            self.A_tf: val_data['A'],
+            self.U_tf: val_data['U']
+        }
+        # weights of losses
+        weight_A = options.get('weight_A', 0.)
+        weight_U = options.get('weight_U', 0.)
+        # Batch size, maximal batch size, number of candidate initial states, batch size growth factor
+        Ns = options.get('batch_size', train_data['X'].shape[1])
+        Ns_max = options.get('max_batch_size', 32768)
+        Ns = np.minimum(Ns, Ns_max)
+        Ns_C = options.get('Ns_C', 2)
+        N_run = options.get('num_runs', 3)
+        N_round = options.get('no_round', 0)
+        BFGS_opts = options.pop('BFGS_opts', {})
+
+        weight_A_tf = tf.placeholder(tf.float32, shape=())
+        weight_U_tf = tf.placeholder(tf.float32, shape=())
+        self.loss = self.loss_V
+        if weight_A >= 10.0 * np.finfo(float).eps:
+            self.loss += weight_A_tf * self.loss_A
+        if weight_U >= 10.0 * np.finfo(float).eps:
+            self.loss += weight_U_tf * self.loss_U
+
+        # Records
+        train_err = []
+        train_grad_err = []
+        train_ctrl_err = []
+
+        val_err = []
+        val_grad_err = []
+        val_ctrl_err = []
+
+        round_iters = []
+
+        errors_to_track = [train_err, train_grad_err, train_ctrl_err]
+        fetches = [[self.MAE, self.grad_MRL2, self.ctrl_MRL2]]
+        # later fetches will be passed to loss_callback as:
+        # loss_callback(*fetches),
+        # our signature of loss_callback is:
+        # def loss_callback(fetches_);
+        # it will then match: fetches_ = [self.MAE, self.grad_MRL2, self.ctrl_MRL2]
+
+        n_run = 0
+        while n_run < N_run:
+            print('')
+            print('# Optimization round %d-%d:' % (N_round, N_run))
+            print('Batch size = %d, gradient weight = %1.1e, control weight = %1.1e'
+                  % (self.Ns, weight_A, weight_U))
+
+            # select Ns samples to train
+            idx = np.random.choice(
+                train_data['X'].shape[1], Ns, replace=False
+            )
+            tf_dict = {
+                self.t_tf: train_data['t'][:, idx],
+                self.X_tf: train_data['X'][:, idx],
+                self.A_tf: train_data['A'][:, idx],
+                self.U_tf: train_data['U'][:, idx],
+                self.V_tf: train_data['V'][:, idx],
+                self.A_scaled_tf: train_data['A_scaled'][:, idx],
+                self.U_scaled_tf: train_data['U_scaled'][:, idx],
+                self.V_scaled_tf: train_data['V_scaled'][:, idx],
+                weight_A_tf: weight_A,
+                weight_U_tf: weight_U
+            }
+
+            self.optimizer = self._train_L_BFGS_B(tf_dict,
+                                                  optimizer=self.optimizer,
+                                                  error_to_track=errors_to_track,
+                                                  fetches=fetches,
+                                                  options=BFGS_opts
+                                                  )
+
+            # Re-Calculate training losses and validation metrics  -----------------------------------------------------
+            loss_V, loss_A, loss_U = self.sess.run(
+                (self.loss_V, self.loss_A, self.loss_U), tf_dict)
+            print('')
+            print('loss_V = %1.1e, loss_A = %1.1e, loss_U = %1.1e' % (loss_V, loss_A, loss_U))
+
+            round_iters.append(len(train_err))
+
+            val_errs = self.sess.run(
+                (self.MAE, self.grad_MRL2, self.ctrl_MRL2), val_data)
+
+            val_err.append(val_errs[0])
+            val_grad_err.append(val_errs[1])
+            val_ctrl_err.append(val_errs[2])
+
+            print('')
+            print('Training MAE error = %1.1e' % (train_err[-1]))
+            print('Validation MAE error = %1.1e' % (val_err[-1]))
+            print('Training grad. MRL2 error = %1.1e' % (train_grad_err[-1]))
+            print('Validation grad. MRL2 error = %1.1e' % (val_grad_err[-1]))
+            print('Training ctrl. MRL2 error = %1.1e' % (train_ctrl_err[-1]))
+            print('Validation ctrl. MRL2 error = %1.1e' % (val_ctrl_err[-1]))
+
+            # ----------------------------------------------------------------------
+            if Ns * Ns_C <= train_data['X'].shape[1]:
+                # Only enlarge batch size if there is enough data
+                Ns = int(Ns * Ns_C)
+            Ns = np.minimum(Ns, Ns_max)
 
         errors = (np.array(train_err), np.array(train_grad_err),
                   np.array(train_ctrl_err), np.array(val_err),
