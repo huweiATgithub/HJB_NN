@@ -365,7 +365,7 @@ class HJBValueNetwork:
             print('')
             print('# Optimization round %d-%d:' % (N_round, N_run))
             print('Batch size = %d, gradient weight = %1.1e, control weight = %1.1e'
-                  % (self.Ns, weight_A, weight_U))
+                  % (Ns, weight_A, weight_U))
 
             # select Ns samples to train
             idx = np.random.choice(
