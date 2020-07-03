@@ -360,9 +360,9 @@ class HJBValueNetwork:
         # def loss_callback(fetches_);
         # it will then match: fetches_ = [self.MAE, self.grad_MRL2, self.ctrl_MRL2]
 
-        for n_run in range(1, N_run):
+        for n_run in range(1, N_run+1):
             print('')
-            print('# Optimization round %d-%d:' % (N_round, N_run))
+            print('# Optimization round %d-%d:' % (N_round, n_run))
             print('Batch size = %d, gradient weight = %1.1e, control weight = %1.1e'
                   % (Ns, weight_A, weight_U))
 
