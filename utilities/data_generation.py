@@ -1,15 +1,17 @@
 import time
 import warnings
+from typing import List
+
 import numpy as np
 import scipy.io
 from models.problem import ProblemPrototype, ConfigPrototype
 from utilities.ode_solver import tpbvp_hjb_solve_time_march
+from networks.neural_networks import HJBValueNetwork
 
 
 def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
                              X0_sample=None, initial_tol=1e-1,
                              save_path=None):
-
     X0s = X0_sample
     if isinstance(X0s, str):
         if X0s == 'train':
@@ -98,6 +100,48 @@ def generate_data_time_march(problem: ProblemPrototype, config: ConfigPrototype,
     else:
         return save_dict
 
+
+def generate_data_ensembles(master_model: HJBValueNetwork, models: List[HJBValueNetwork],
+                            n_candidate, num_samples=1, sample_mode='arbitrary'):
+    N_states = master_model.problem.N_states
+    t_OUT = np.empty((1, 0))
+    X_OUT = np.empty((N_states, 0))
+    A_OUT = np.empty((N_states, 0))
+    V_OUT = np.empty((1, 0))
+
+    start_time = time.time()
+    print("Generating data:")
+    n = 0
+    n_tries = 0
+    while n < num_samples:
+        n_tries += 1
+        X0 = master_model.sample_X0(n_candidate, mode=sample_mode)
+        values = [master_model.predict_V(t=np.zeros((1, n_candidate)), X=X0)]
+        values += [model.predict_V(t=np.zeros((1, n_candidate)), X=X0) for model in models]
+        values_np = np.vstack(values)
+        variance = np.var(values_np, axis=0, dtype=np.float64)
+        idx = np.argmin(variance).item()
+        X0 = X0[:, idx]
+        status, (t, X, A, V) = master_model.generate_single_data(X0)
+        if status:
+            n += 1
+            t_OUT = np.hstack((t_OUT, t))
+            X_OUT = np.hstack((X_OUT, X))
+            A_OUT = np.hstack((A_OUT, A))
+            V_OUT = np.hstack((V_OUT, V))
+
+    print("Generated %d data from %d (of %d tries) BVP solutions in %.1f sec" %
+          (X_OUT.shape[1], n, n_tries, time.time() - start_time))
+
+    data = {'t': t_OUT, 'X': X_OUT, 'A': A_OUT, 'V': V_OUT,
+            'U': master_model.problem.U_star(np.vstack((X_OUT, A_OUT)))
+            }
+    data.update({
+        'A_scaled': 2. * (data['A'] - master_model.A_lb) / (master_model.A_ub - master_model.A_lb) - 1.,
+        'U_scaled': 2. * (data['U'] - master_model.U_lb) / (master_model.U_ub - master_model.U_lb) - 1.,
+        'V_scaled': 2. * (data['V'] - master_model.V_min) / (master_model.V_max - master_model.V_min) - 1.
+    })
+    return data
 
 
 

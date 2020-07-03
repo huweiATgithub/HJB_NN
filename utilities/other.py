@@ -62,3 +62,4 @@ def get_scaling_from_data_dict(data_dict: dict):
         'V_min': np.min(V_OUT).flatten(), 'V_max': np.max(V_OUT).flatten(),
     }
     return scaling
+
